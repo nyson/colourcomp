@@ -39,7 +39,7 @@ getLR xs = let list = (catMaybes . map tupIt . splitOn "&") xs
            in (getStr 'l' list, getStr 'r' list)
   where tupIt (c:'=':cs) = Just (c,cs)
         tupIt _          = Nothing
-        getStr c = trace (snd . head . filter ((== c) . fst)
+        getStr c = snd . head . filter ((== c) . fst)
    
 setCol origin colBox = do
   Just text <- getValue origin
