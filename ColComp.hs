@@ -8,38 +8,59 @@ import Data.Char (toUpper, toLower)
 import Data.List.Split (splitOn)
 import Data.List
 import Data.Maybe (catMaybes)
-
+import Numeric (showHex)
 import Debug.Trace
+
+toHex :: Int -> String
+toHex i | i < 0 = error "no negatives allowed"
+        | i >= 0  && i < 10 = show i
+        | i >= 10 && i < 16 = (:"") $ ['A'..'F'] !! (i - 10)
+toHex i = let (d, m) = (i `div` 16, i `mod` 16)
+          in toHex d ++ toHex m
+
+randomColour :: IO String
+randomColour = do
+  gen <- newSeed
+  let r:g:b:_ = (randomRs (0,255) gen :: [Int])
+  return $ '#':concatMap fix [r,g,b]
+    where
+      fix i = case toHex $ i `div` 2 + 128 of
+        h:[] -> '0':h:[]
+        str  -> take 2 str
+    
 
 main = do
   url <- urlHash
-  let (l, r) = getLR url
-  elems <- mapM elemById ["left", "right", "leftCol", "rightCol"]
+  let table = urlTable $ drop 1 url
   
+  
+  elems <- mapM elemById ["left", "right", "leftCol", "rightCol"]  
   case catMaybes elems of
    [left, right, leftCol, rightCol] -> do
-     case prettify l of
-      Just str -> setProp left "value" str
-      _        -> setProp left "value" "#FFFFFF"
-     case prettify r of
-      Just str -> setProp right "value" str
-      _        -> setProp right "value" "#000000"
-
      setCol left leftCol
-     left `onEvent` KeyUp $ \_ -> setCol left leftCol 
+     case lookup 'l' table of
+      Just col -> setProp left "value" col
+      Nothing  -> do col <- randomColour
+                     setProp left "value" col
+     case lookup 'r' table of
+      Just col -> setProp right "value" col
+      Nothing  -> do col <- randomColour
+                     setProp right "value" col
+     
+     setCol left leftCol
      setCol right rightCol
+     left `onEvent` KeyUp $ \_ -> setCol left leftCol 
      right `onEvent` KeyUp $ \_ -> setCol right rightCol
+
      return ()
      
    _ -> alert $ "I'm missing some elements here! Make sure you have "
         ++ "'left', 'right', 'leftCol' and 'rightCol'!"
 
-getLR :: String -> (String, String)
-getLR xs = let list = (catMaybes . map tupIt . splitOn "&") xs
-           in (getStr 'l' list, getStr 'r' list)
-  where tupIt (c:'=':cs) = Just (c,cs)
-        tupIt _          = Nothing
-        getStr c = snd . head . filter ((== c) . fst)
+urlTable :: String -> [(Char, String)]
+urlTable = (catMaybes . map tupIt . splitOn "&")
+ where tupIt (l:'=':cs) = Just (l,cs)
+       tupIt _          = Nothing 
    
 setCol origin colBox = do
   Just text <- getValue origin
